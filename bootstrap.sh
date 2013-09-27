@@ -1,4 +1,6 @@
 #!/bin/bash
+mkdir krakatoa-experimental && cd krakatoa-experimental
+
 git init
 git config core.sparsecheckout true
 touch .git/info/sparse-checkout
@@ -9,4 +11,4 @@ git pull origin master
 echo $1/ > .git/info/sparse-checkout
 git checkout
 
-rm ./bootstrap.sh
+# rm ./bootstrap.sh
