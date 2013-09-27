@@ -2,7 +2,7 @@ require 'cgi'
 require 'openssl'
 require 'base64'
 
-module Rask
+module SampleGem
   class RsaAuth
     def initialize(app)
       @app = app
@@ -16,7 +16,7 @@ module Rask
     end
 
     def signature_is_valid?(env)
-      key = OpenSSL::PKey::RSA.new(IO.read("key.pub"))
+      key = OpenSSL::PKey::RSA.new(IO.read("../key.pub"))
 
       req = Rack::Request.new(env)
       verb = env["REQUEST_METHOD"]
