@@ -8,7 +8,7 @@
   integer = ('+'|'-')?[0-9]+;
 
   action number {
-    printf("Hola putos!: %c\n", fc);
+    printf("Hola!: %c\n", fc);
   }
 
   main := |*
