@@ -27,17 +27,9 @@ void data_append(Data *d, char p) {
 %%{
   machine test_lexer;
 
-  action number {
-    data_append(&theData, fc);
-  }
-
-  action other {
-    printf("  Accumulated: %s\n", theData.data);
-  }
-
   integer = (
-    ( ('+'|'-')? [0-9]+ ) $number
-  ) %!other;
+    ( ('+'|'-')? [0-9]+ ) ${ data_append(&theData, fc); }
+  ) %!{ printf("  Accumulated: %s\n", theData.data); };
 
   main := (integer)*;
 }%%
