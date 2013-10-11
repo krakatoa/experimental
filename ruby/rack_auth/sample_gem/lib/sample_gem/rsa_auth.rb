@@ -2,16 +2,29 @@ require 'cgi'
 require 'openssl'
 require 'base64'
 
+require 'xmpp4r'
+
 module SampleGem
   class RsaAuth
+    @@sender_jid = Jabber::JID.new('fercho@localhost')
+    @@client = Jabber::Client.new(@@sender_jid)
+    @@client.connect('192.168.1.107')
+    @@client.auth('')
+    @@receiver_jid = Jabber::JID.new("otro@localhost")
+
     def initialize(app)
       @app = app
     end
 
     def call(env)
       #$stdout.puts "PRE"
+      start = Time.now
       result = @app.call(env)
+      stop = Time.now
+
       $stdout.puts "IsValid?: #{signature_is_valid?(env)}"
+      message = Jabber::Message::new(@@receiver_jid, "Hola, tarde #{stop - start}s. [#{env}] (desde Rails)").set_type(:normal).set_id('1')
+      @@client.send(message)
       result
     end
 

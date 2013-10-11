@@ -2,6 +2,7 @@ PATH
   remote: ../sample_gem
   specs:
     sample_gem (0.0.1)
+      xmpp4r
 
 GEM
   remote: https://rubygems.org/
@@ -102,6 +103,7 @@ GEM
     uglifier (2.2.1)
       execjs (>= 0.3.0)
       multi_json (~> 1.0, >= 1.0.2)
+    xmpp4r (0.5)
 
 PLATFORMS
   ruby
