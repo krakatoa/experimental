@@ -1,2 +1,3 @@
 *.lock
+*.beam
 *.rbenv-version

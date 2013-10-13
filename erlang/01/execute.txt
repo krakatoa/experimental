@@ -1,0 +1,19 @@
+Compiling
+=========
+
+erlc test.erl
+erlc shop.erl
+
+erl -noshell -s test start 7 -s init stop
+$ Hola mundo 35
+
+From Shell
+==========
+$ erl
+
+c(test).
+c(shop).
+
+test:start().
+
+=> Hola mundo 5
