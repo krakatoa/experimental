@@ -1,0 +1,33 @@
+<html>
+<head>
+  <script type="text/javascript">
+offerAnswerConstraints={optional:[],mandatory:{OfferToReceiveAudio:false,OfferToReceiveVideo:false}};config={iceServers:[{url:"stun:stun.l.google.com:19302"}]};serializePeerData=function(e,t){var n={session:{sdp:e.sdp,type:e.type},iceCandidates:t};return escape(JSON.stringify(n))};deserializePeerData=function(e){var t=JSON.parse(unescape(e));var e={session:new RTCSessionDescription(t.session),iceCandidates:[]};t.iceCandidates.forEach(function(t){e.iceCandidates.push(new RTCIceCandidate(t))});return e};showPeerData=function(e,t){document.getElementById("peerData"+t).value=e};readPeerData=function(e){return deserializePeerData(document.getElementById("peerData"+e).value)};hidePeerData=function(e){document.getElementById("peerData"+e).style.display="none"};appendToChat=function(e,t){var t=e+" dice: "+t;var n=document.getElementById("chat");n.value=n.value+t+"\n"};receivedMessage=function(e){hidePeerData("A");hidePeerData("B");e=JSON.parse(e);appendToChat(e.nick,e.text)};aSide=function(){var e=null;aConnection=new webkitRTCPeerConnection(config,{optional:[{RtpDataChannels:true}]});sendChannel=aConnection.createDataChannel("mychannel",{reliable:false});sendChannel.onmessage=function(e){receivedMessage(e.data)};var t=[];aConnection.onicecandidate=function(e){if(e.candidate){t.push(e.candidate)}};aConnection.ongatheringchange=function(n){if(n.currentTarget.iceGatheringState=="complete"){aRawIce=[];t.forEach(function(e){aRawIce.push({sdpMLineIndex:e.sdpMLineIndex,sdpMid:e.sdpMid,candidate:e.candidate})});var r=serializePeerData(e,aRawIce);showPeerData(r,"A");console.log("Wait for B")}};gotADescription=function(t){e=t;aConnection.setLocalDescription(e)};aConnection.createOffer(gotADescription,null,offerAnswerConstraints)};bSide=function(){var e=readPeerData("A");var t=e.session;var n=e.iceCandidates;var r=null;bConnection=new webkitRTCPeerConnection(config,{optional:[{RtpDataChannels:true}]});bConnection.ondatachannel=function(e){receiveChannel=e.channel;receiveChannel.onmessage=function(e){receivedMessage(e.data)}};bConnection.setRemoteDescription(t);n.forEach(function(e){bConnection.addIceCandidate(e)});var i=[];bConnection.onicecandidate=function(e){if(e.candidate){i.push(e.candidate)}};bConnection.ongatheringchange=function(e){if(e.currentTarget.iceGatheringState=="complete"){bRawIce=[];i.forEach(function(e){bRawIce.push({sdpMLineIndex:e.sdpMLineIndex,sdpMid:e.sdpMid,candidate:e.candidate})});var t=serializePeerData(r,bRawIce);showPeerData(t,"B");console.log("B is ready")}};gotBDescription=function(e){r=e;bConnection.setLocalDescription(r)};bConnection.createAnswer(gotBDescription,null,offerAnswerConstraints)};finishASide=function(){var e=readPeerData("B");var t=e.session;var n=e.iceCandidates;aConnection.setRemoteDescription(t);n.forEach(function(e){aConnection.addIceCandidate(e)});console.log("A is ready")};trySend=function(){var e=null;if(!(typeof sendChannel=="undefined")){e=sendChannel}if(!(typeof receiveChannel=="undefined")){e=receiveChannel}var t=document.getElementById("nick").value;var n=document.getElementById("chatText").value;var r={nick:t,text:n};appendToChat(t,n);e.send(JSON.stringify(r))}
+  </script>
+  <style type="text/css">
+    textarea {
+      font-size: 10px;
+      margin: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <input type="button" value="start A" onclick="aSide()"/>
+    <input type="button" value="start B" onclick="bSide()"/>
+    <input type="button" value="finish A" onclick="finishASide()"/>
+    <input type="text" id="nick" value="Nick" />
+    <input type="text" id="chatText" value="Text" />
+    <input type="button" value="send" onclick="trySend()"/>
+  </div>
+
+  <div>
+    <textarea id="peerDataA" cols="200" rows="14"></textarea>
+  </div>
+  <div>
+    <textarea id="peerDataB" cols="200" rows="14"></textarea>
+  </div>
+  <div>
+    <textarea id="chat" cols="200" rows="14"></textarea>
+  </div>
+</body>
+</html>
