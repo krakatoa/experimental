@@ -25,19 +25,26 @@ void *map(struct ThreadData *td) {
   printf("[%d][STARTED] %d-%d\n", uid, td->start, td-> end);
   FILE *fp;
   char *readWord;
+  char c = '\0';
 
   fp = fopen("input.txt", "r");
   if (fp == NULL) {
     printf("Could not open input file.\n");
   } else {
     fseek(fp, td->start, SEEK_SET);
-    if (td->start > 0) {
-      fscanf(fp, "%*[A-Za-z]%m[^$,. \t\v\f\n\r]", &readWord);
+    c = fgetc(fp);
+    fseek(fp, td->start, SEEK_SET);
+    if (isspace(c)) {
+      printf("era un espacio nomas...\n");
+    } else {
+      if (td->start > 0) {
+        fscanf(fp, "%*[A-Za-z]%m[^$,. \t\v\f\n\r]", &readWord);
+      }
     }
-    while(!feof(fp) && ftell(fp) < td->end) {
+    while(!feof(fp) && ftell(fp) <= td->end) {
       scanNext(&readWord, &fp, uid);
     }
-    if (ftell(fp) == td->end) { // It means last char is a space, so next batch will not know if string is truncated. Will process here
+    if (ftell(fp) == td->end + 1) { // It means last char is a space, so next batch will not know if string is truncated. Will process here
       scanNext(&readWord, &fp, uid);
     }
     fclose(fp);
