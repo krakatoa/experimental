@@ -1,0 +1,17 @@
+Download & Install
+==================
+wget http://haproxy.1wt.eu/download/1.4/src/haproxy-1.4.24.tar.gz
+tar -xvzf haproxy-1.4.24.tar.gz
+
+cd haproxy-1.4.24/
+make TARGET=linux26
+sudo make install
+
+Faye Configuration
+==================
+sudo cp ./haproxy.cfg /etc/haproxy.cfg
+haproxy -f /etc/haproxy.cfg
+
+Haproxy 1.4 Manual
+==================
+http://cbonte.github.io/haproxy-dconv/configuration-1.4.html

@@ -1,0 +1,57 @@
+<html lang='en'>
+  <head>
+    <title>Realtime work progress</title>
+    <script type="text/javascript" src='./faye-browser.js'></script>
+    <script type="text/javascript">
+      var randomPort = 5000;// + Math.round(Math.random() * 2);
+      var channel = Math.round(Math.random() * 3);
+      //alert('Connected Faye client to http://127.0.0.1:' + randomPort);
+
+      // TESTING TOKENS
+      //var token = "none-token";
+      var token = "a-token";
+      //var token = "b-token";
+      //var token = "a-b-token";
+      
+      createFayeClient = function(token) {
+        var client = new Faye.Client('http://localhost:' + randomPort + '/faye');
+        clientAuth = {
+          outgoing: function(message, callback) {
+            if (message.channel != "/meta/subscribe") {
+              return callback(message);
+            };
+            message.ext = {token: token};
+            callback(message);
+          }
+        };
+        client.addExtension(clientAuth);
+        return client;
+      }
+      console.log("creating client using token: " + token);
+      var client = createFayeClient(token);
+
+      attemptSubscription = function(channel) {
+        console.log("attempting subscription to: /foo/" + channel);
+        return client.subscribe('/foo/' + channel, function(message) {
+          var el = document.getElementById('output');
+          el.value = el.value + JSON.stringify(message) + "\n";
+          //console.log(JSON.stringify(message));
+        });
+      }; 
+      if (channel == 0) {
+        subscription = attemptSubscription("a");
+        subscription = attemptSubscription("b");
+      } else if (channel == 1) {
+        subscription = attemptSubscription("a");
+        subscription = attemptSubscription("b");
+      } else if (channel == 2) {
+        subscription = attemptSubscription("a");
+        subscription = attemptSubscription("b");
+      };
+
+    </script>
+  </head>
+<body>
+  <textarea rows=35 cols=130 id='output'></textarea>
+</body>
+</html>
