@@ -7,10 +7,13 @@
 struct ThreadData {
   int start, end;
   int *fd;
+  pthread_mutex_t *mutex;
 };
 
 struct ReduceData {
   int *fd;
+  int expect;
+  pthread_mutex_t *mutex;
 };
 
 void *skipFirst(FILE **file, int uid) {
@@ -75,8 +78,10 @@ void *map(struct ThreadData *td) {
     while(!feof(fp) && ftell(fp) <= td->end + 1) {
       scanNext(&readWord, &fp, uid);
       if (readWord) {
-        printf("(%d) -> %s (@%d)\n", uid, readWord, ftell(fp));
+        pthread_mutex_lock(td->mutex);
+        //readWord[strlen(readWord)] = '\n';
         result = write(td->fd[1], readWord, (strlen(readWord) + 1));
+        printf("(%d) -> %s (@%d)\n", uid, readWord, ftell(fp));
         free(readWord);
         //if (result != 1){
         //  perror("write");
@@ -85,6 +90,9 @@ void *map(struct ThreadData *td) {
     }
     fclose(fp);
   }
+
+  pthread_mutex_lock(td->mutex);
+  write(td->fd[1], "FINISHED", 9);
   //printf("[%d][FINISHED]\n", uid);
   pthread_exit(NULL);
   
@@ -96,15 +104,21 @@ void *reduce(struct ReduceData *rd) {
   char buffer[256];
 
   int result;
+  int remaining = rd->expect;
 
-  while(1) {
-    result = read(rd->fd[0], buffer, sizeof(buffer));
-    //result = read(rd->fd[0], buffer, strlen(buffer) + 1);
+  while(remaining > 0) {
+    result = read(rd->fd[0], buffer, 256);
+    pthread_mutex_unlock(rd->mutex);
     if (result < 1) {
       perror("read");
       exit(2);
+    } else {
+      printf("Read: %s\n", buffer);
+      if (strcmp(buffer, "FINISHED") == 0) {
+
+      remaining = remaining - 1;
+      }
     }
-    printf("Read: %s\n", buffer);
   }
 
   printf("[FINISHED REDUCE]\n");
@@ -116,32 +130,41 @@ int main(void) {
   pthread_t thread[4];
   struct ThreadData data[4];
 
+  pthread_mutex_t pipeMutex;
+
   int fd[2];
   pipe(fd);
-  //int fd2[2];
-  //pipe(fd2);
+
   pthread_t reduce_t[1];
   struct ReduceData reduce_data[1];
   reduce_data[0].fd = fd;
+  reduce_data[0].mutex = &pipeMutex;
+  reduce_data[0].expect = 4;
 
   data[0].start = 0;
   data[0].end = 9;
   data[0].fd = fd;
+  data[0].mutex = &pipeMutex;
 
   data[1].start = 10;
   data[1].end = 19;
   data[1].fd = fd;
+  data[1].mutex = &pipeMutex;
 
   data[2].start = 20;
   data[2].end = 29;
   data[2].fd = fd;
+  data[2].mutex = &pipeMutex;
 
   data[3].start = 30;
   data[3].end = 39;
   data[3].fd = fd;
+  data[3].mutex = &pipeMutex;
 
-  int i;
   pthread_create(&reduce_t[0], NULL, (void *)reduce, &reduce_data[0]);
+
+  pthread_mutex_init(&pipeMutex, NULL);
+  int i;
   for (i = 0; i < 4; i++) {
     pthread_create(&thread[i], NULL, (void *)map, &data[i]);
   }
@@ -150,6 +173,7 @@ int main(void) {
   for (i = 0; i < 4; i++) {
     pthread_join(thread[i], NULL);
   }
+  pthread_mutex_destroy(&pipeMutex);
 
   return 0;
 }
