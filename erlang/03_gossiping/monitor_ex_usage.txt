@@ -1,0 +1,16 @@
+1> c(monitor).
+monitor.erl:4: Warning: record member is unused
+monitor.erl:5: Warning: record status is unused
+{ok,monitor}
+2> rr(monitor).
+[member,monitor_data,status]
+3> Monitor = monitor:start().
+<0.43.0>
+4> monitor:add(Monitor, "127.0.0.1", #member{host="localhost"}).
+Adding!
+ok
+5> monitor:show(Monitor).
+X: "127.0.0.1" {member,"localhost",undefined,agent}.
+--
+ok
+6>
