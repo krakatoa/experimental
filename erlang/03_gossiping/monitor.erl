@@ -29,9 +29,10 @@ loop(MonitorData=#monitor_data{}) ->
     {Pid, MsgRef, {add, Ip, Member}} ->
       Pid ! {ok, MsgRef},
       NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
-      loop(MonitorData#monitor_data{members=NewMembers});
+      NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
+      loop(MonitorData#monitor_data{members=NewMembers, status=NewStatus});
     {Pid, MsgRef, {show}} ->
-      [io:format("X: ~p ~p.~n", [Ip, Member]) || {Ip, Member} <- MonitorData#monitor_data.members],
+      [io:format("X: ~p ~p (~p).~n", [Ip, Member, Status]) || {Ip, Member} <- MonitorData#monitor_data.members, {ok, Status} <- [(orddict:find(Ip, MonitorData#monitor_data.status))]],
       Pid ! {ok, MsgRef},
       loop(MonitorData)
   end.
