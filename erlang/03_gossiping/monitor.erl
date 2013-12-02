@@ -1,13 +1,14 @@
 -module(monitor).
 
--record(monitor_data, {members, status}).
--record(member, {host, tag, kind=agent}).
--record(status, {status=up}).
+-export([monitor_start/0,monitor_start_link/0,init/1,add/3,show/1]).
+-include("monitor.hrl").
 
--export([start/0,add/3,loop/1,show/1]).
+monitor_start() ->
+  Pid = spawn(monitor, init, [#monitor_data{members=orddict:new(), status=orddict:new()}]),
+  Pid.
 
-start() ->
-  Pid = spawn(monitor, loop, [#monitor_data{members=orddict:new(), status=orddict:new()}]),
+monitor_start_link() ->
+  Pid = spawn_link(monitor, init, [#monitor_data{members=orddict:new(), status=orddict:new()}]),
   Pid.
 
 add(Pid, Ip, Member) ->
@@ -23,6 +24,10 @@ show(Pid) ->
   receive
     {ok, Ref} -> io:format("--~n")
   end.
+
+init(MonitorData=#monitor_data{}) ->
+  timer:send_interval(10000, self(), {self(), make_ref(), {show}}),
+  loop(MonitorData).
 
 loop(MonitorData=#monitor_data{}) ->
   receive
