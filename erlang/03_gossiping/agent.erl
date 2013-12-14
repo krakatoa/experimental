@@ -12,9 +12,18 @@ agent_start_link() ->
   Pid.
 
 init() ->
+  timer:send_interval(1000, self(), {internal, send_heartbeat}),
   loop().
 
 loop() ->
   receive
-    _ -> io:format("received!~n")
+    {internal, send_heartbeat} ->
+      send_heartbeat(),
+      loop();
+    _ ->
+      io:format("received!~n"),
+      loop()
   end.
+
+send_heartbeat() ->
+  monitor ! {self(), make_ref(), {heartbeat, "127.0.0.1"}}.
