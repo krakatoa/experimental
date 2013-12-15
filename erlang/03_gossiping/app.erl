@@ -2,6 +2,7 @@
 
 -import(monitor, [monitor_start/0, monitor_start_link/0, add/3, show/1]).
 -import(agent, [agent_start/0, agent_start_link/0]).
+-import(gossip, [gossip_start/0, gossip_start_link/0]).
 -export([start/0, start_link/0, init/0, add_agent/2]).
 -include("monitor.hrl").
 
@@ -41,9 +42,15 @@ init(Monitor, InternalAgent) ->
       init(Monitor, NewAgent);
     _ -> io:format("~p~n", [InternalAgent])
   end,
-  loop(Monitor, InternalAgent).
+  Gossip = init_gossip(),
+  loop(Monitor, InternalAgent, Gossip).
 
-loop(Monitor, InternalAgent) ->
+init_gossip() ->
+  Gossip = gossip:gossip_start_link(),
+  register(gossip, Gossip),
+  Gossip.
+
+loop(Monitor, InternalAgent, Gossip) ->
   receive
     {'EXIT', Monitor, normal} -> ok;
     {'EXIT', Monitor, _} -> init(undefined, InternalAgent);

@@ -18,6 +18,10 @@ add(Pid, Ip, Member) ->
     {ok, Ref} -> io:format("Adding!~n")
   end.
 
+gossip(StatusList) ->
+  Flattened = list_to_binary(io_lib:format("~w", [StatusList])),
+  gossip ! {send, Flattened}.
+
 show(Pid) ->
   Ref = make_ref(),
   Pid ! {self(), Ref, {show}},
@@ -51,6 +55,7 @@ check(StatusList, Index) when Index =< length(StatusList) ->
   end;
 check(StatusList, Index) when Index > length(StatusList) ->
   % io:format("finished~n").
+  gossip(StatusList),
   StatusList.
 
 init(MonitorData=#monitor_data{}) ->
