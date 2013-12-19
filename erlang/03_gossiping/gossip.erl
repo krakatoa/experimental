@@ -1,13 +1,14 @@
 -module(gossip).
--export([gossip_start/0, gossip_start_link/0, init/0]).
+-export([start/0, start_link/0, init/0]).
 
-gossip_start() ->
+start() ->
   Pid = spawn(?MODULE, init, []),
-  Pid.
+  {ok, Pid}.
 
-gossip_start_link() ->
+start_link() ->
   Pid = spawn_link(?MODULE, init, []),
-  Pid.
+  register(gossip, Pid),
+  {ok, Pid}.
 
 init() ->
   timer:send_interval(5000, self(), get),

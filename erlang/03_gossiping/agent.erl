@@ -1,29 +1,37 @@
 -module(agent).
+-behaviour(gen_server).
 
--export([agent_start/0, agent_start_link/0, init/0]).
+-export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+% -export([send_heartbeat/1]).
 -include("monitor.hrl").
 
-agent_start() ->
-  Pid = spawn(?MODULE, init, []),
-  Pid.
+start_link() ->
+  gen_server:start_link({local, agent}, ?MODULE, [], []).
 
-agent_start_link() ->
-  Pid = spawn_link(?MODULE, init, []),
-  Pid.
+% send_heartbeat(Pid) ->
+%   gen_server:cast(Pid, {internal, send_heartbeat}).
 
-init() ->
-  timer:send_interval(1000, self(), {internal, send_heartbeat}),
-  loop().
+init([]) ->
+  erlang:send_after(1000, self(), {internal, send_heartbeat}),
+  {ok, []}.
 
-loop() ->
-  receive
-    {internal, send_heartbeat} ->
-      send_heartbeat(),
-      loop();
-    _ ->
-      io:format("received!~n"),
-      loop()
-  end.
+handle_cast(_Msg, []) ->
+  {noreply, []}.
 
-send_heartbeat() ->
-  monitor ! {self(), make_ref(), {heartbeat, "127.0.0.1"}}.
+handle_call(terminate, _From, []) ->
+  {stop, normal, ok, []}.
+
+handle_info({internal, send_heartbeat}, []) ->
+  % io:format("send heartbeat!~n"),
+  gen_server:cast(monitor, {heartbeat, "127.0.0.1"}),
+  erlang:send_after(1000, self(), {internal, send_heartbeat}),
+  {noreply, []};
+handle_info(Msg, []) ->
+  io:format("Unexpected message: ~p", [Msg]),
+  {noreply, []}.
+
+terminate(normal, []) ->
+  ok.
+
+code_change(_OldVsn, State, _Extra) ->
+  {ok, State}.

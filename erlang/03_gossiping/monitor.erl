@@ -1,33 +1,31 @@
 -module(monitor).
+-behaviour(gen_server).
 
--export([monitor_start/0,monitor_start_link/0,init/1,add/3,show/1, check/1, check/2]).
+-export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
+-export([add/3, show/1, check/1, check/2]).
 -include("monitor.hrl").
 
-monitor_start() ->
-  Pid = spawn(monitor, init, [#monitor_data{members=orddict:new(), status=orddict:new()}]),
-  Pid.
-
-monitor_start_link() ->
-  Pid = spawn_link(monitor, init, [#monitor_data{members=orddict:new(), status=orddict:new()}]),
-  Pid.
+start_link() ->
+  gen_server:start_link({local, monitor}, ?MODULE, #monitor_data{members=orddict:new(), status=orddict:new()}, []).
 
 add(Pid, Ip, Member) ->
-  Ref = make_ref(),
-  Pid ! {self(), Ref, {add, Ip, Member}},
-  receive
-    {ok, Ref} -> io:format("Adding!~n")
-  end.
+  gen_server:call(Pid, {add, Ip, Member}).
+
+show(Pid) ->
+  gen_server:cast(Pid, show).
+
+add_agent(Ip, Member=#member{}, MonitorData) ->
+  % Member = #member{host=Host,tag=Tag,kind=agent},
+  NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
+  NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
+  MonitorData#monitor_data{members=NewMembers, status=NewStatus}.
+
+add_internal_agent(MonitorData) ->
+  add_agent("127.0.0.1", #member{host="localhost", tag="internal"}, MonitorData).
 
 gossip(StatusList) ->
   Flattened = list_to_binary(io_lib:format("~w", [StatusList])),
   gossip ! {send, Flattened}.
-
-show(Pid) ->
-  Ref = make_ref(),
-  Pid ! {self(), Ref, {show}},
-  receive
-    {ok, Ref} -> io:format("--~n")
-  end.
 
 check(StatusList) ->
   check(StatusList, 1).
@@ -54,35 +52,44 @@ check(StatusList, Index) when Index =< length(StatusList) ->
       check(NewStatusList, Index + 1)
   end;
 check(StatusList, Index) when Index > length(StatusList) ->
-  % io:format("finished~n").
-  gossip(StatusList),
+  io:format("finished~n"),
+  % gossip(StatusList),
   StatusList.
 
 init(MonitorData=#monitor_data{}) ->
-  timer:send_interval(1000, self(), {self(), make_ref(), {show}}),
-  timer:send_interval(5000, self(), {self(), make_ref(), {check}}),
-  loop(MonitorData).
+  erlang:send_after(1000, self(), {internal, show}),
+  erlang:send_after(5000, self(), {internal, check}),
+  {ok, add_internal_agent(MonitorData)}.
 
-loop(MonitorData=#monitor_data{}) ->
-  receive
-    {Pid, MsgRef, {add, Ip, Member}} ->
-      Pid ! {ok, MsgRef},
-      NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
-      NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
-      loop(MonitorData#monitor_data{members=NewMembers, status=NewStatus});
-    {Pid, MsgRef, {check}} ->
-      Pid ! {ok, MsgRef},
-      loop(MonitorData#monitor_data{status=check(MonitorData#monitor_data.status)});
-    {Pid, MsgRef, {show}} ->
-      % [io:format("X: ~p ~p (~p).~n", [Ip, Member, Status]) || {Ip, Member} <- MonitorData#monitor_data.members, {ok, Status} <- [(orddict:find(Ip, MonitorData#monitor_data.status))]],
-      [io:format("X: ~p ~p (~p)~n", [Ip, timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000, StatusRecord#status.status]) || {Ip, StatusRecord} <- MonitorData#monitor_data.status, StatusRecord#status.last_heartbeat =/= undefined],
-      Pid ! {ok, MsgRef},
-      loop(MonitorData);
-    {_Pid, _MsgRef, {heartbeat, Ip}} ->
-      % {ok, Member} = orddict:find(Ip, MonitorData#monitor_data.members),
-      {ok, Status} = orddict:find(Ip, MonitorData#monitor_data.status),
-      NewStatus = orddict:store(Ip, Status#status{last_heartbeat=os:timestamp()}, MonitorData#monitor_data.status),
-      % timer:now_diff(T2, T1) / 1000 / 1000 % difference in seconds
-      io:format("Heartbeat from ~p~n", [NewStatus]),
-      loop(MonitorData#monitor_data{status=NewStatus})
-  end.
+handle_call({add, Ip, Member}, From, MonitorData) ->
+  %NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
+  %NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
+  {reply, ok, add_agent(Ip, Member, MonitorData)}.
+
+handle_cast(check, MonitorData) ->
+  {noreply, MonitorData#monitor_data{status=check(MonitorData#monitor_data.status)}};
+handle_cast(show, MonitorData) ->
+  io:format("Will show...~n"),
+  % [io:format("X: ~p ~p (~p).~n", [Ip, Member, Status]) || {Ip, Member} <- MonitorData#monitor_data.members, {ok, Status} <- [(orddict:find(Ip, MonitorData#monitor_data.status))]],
+  [io:format("X: ~p ~p (~p)~n", [Ip, timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000, StatusRecord#status.status]) || {Ip, StatusRecord} <- MonitorData#monitor_data.status, StatusRecord#status.last_heartbeat =/= undefined],
+  {noreply, MonitorData};
+handle_cast({heartbeat, Ip}, MonitorData) ->
+  {ok, Status} = orddict:find(Ip, MonitorData#monitor_data.status),
+  NewStatus = orddict:store(Ip, Status#status{last_heartbeat=os:timestamp()}, MonitorData#monitor_data.status),
+  io:format("Heartbeat from ~p~n", [NewStatus]),
+  {noreply, MonitorData#monitor_data{status=NewStatus}}.
+
+handle_info({internal, show}, MonitorData) ->
+  gen_server:cast(self(), show),
+  erlang:send_after(1000, self(), {internal, show}),
+  {noreply, MonitorData};
+handle_info({internal, check}, MonitorData) ->
+  gen_server:cast(self(), check),
+  erlang:send_after(5000, self(), {internal, check}),
+  {noreply, MonitorData}.
+
+terminate(normal, _MonitorData) ->
+  ok.
+
+code_change(_OldVsn, State, _Extra) ->
+  {ok, State}.
