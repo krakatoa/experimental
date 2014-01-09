@@ -22,7 +22,6 @@ handle_call(terminate, _From, []) ->
   {stop, normal, ok, []}.
 
 handle_info({internal, send_heartbeat}, []) ->
-  % io:format("send heartbeat!~n"),
   gen_server:cast(monitor, {heartbeat, "127.0.0.1"}),
   erlang:send_after(1000, self(), {internal, send_heartbeat}),
   {noreply, []};

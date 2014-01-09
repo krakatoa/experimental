@@ -25,14 +25,16 @@ add_internal_agent(MonitorData) ->
 
 gossip(StatusList) ->
   Flattened = list_to_binary(io_lib:format("~w", [StatusList])),
-  gossip ! {send, Flattened}.
+  % gossip ! {send, Flattened}.
+  io:format("monitor:gossip ~p~n", [Flattened]),
+  gen_server:cast(gossip, {send, Flattened}).
 
 check(StatusList) ->
   check(StatusList, 1).
 check(StatusList, Index) when Index =< length(StatusList) ->
   % [NewStatusList, [Ip, timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000]) || {Ip, StatusRecord} <- MonitorData#monitor_data.status, StatusRecord#status.last_heartbeat =/= undefined].
   {Ip, StatusRecord} = lists:nth(Index, StatusList),
-  io:format("Will check ~p~n", [Ip]),
+  % io:format("Will check ~p~n", [Ip]),
   case StatusRecord#status.last_heartbeat =/= undefined of
     true -> ElapsedTime = timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000;
     false -> ElapsedTime = 0
@@ -52,8 +54,7 @@ check(StatusList, Index) when Index =< length(StatusList) ->
       check(NewStatusList, Index + 1)
   end;
 check(StatusList, Index) when Index > length(StatusList) ->
-  io:format("finished~n"),
-  % gossip(StatusList),
+  gossip(StatusList),
   StatusList.
 
 init(MonitorData=#monitor_data{}) ->
@@ -69,14 +70,13 @@ handle_call({add, Ip, Member}, From, MonitorData) ->
 handle_cast(check, MonitorData) ->
   {noreply, MonitorData#monitor_data{status=check(MonitorData#monitor_data.status)}};
 handle_cast(show, MonitorData) ->
-  io:format("Will show...~n"),
   % [io:format("X: ~p ~p (~p).~n", [Ip, Member, Status]) || {Ip, Member} <- MonitorData#monitor_data.members, {ok, Status} <- [(orddict:find(Ip, MonitorData#monitor_data.status))]],
-  [io:format("X: ~p ~p (~p)~n", [Ip, timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000, StatusRecord#status.status]) || {Ip, StatusRecord} <- MonitorData#monitor_data.status, StatusRecord#status.last_heartbeat =/= undefined],
+  % [io:format("X: ~p ~p (~p)~n", [Ip, timer:now_diff(os:timestamp(), StatusRecord#status.last_heartbeat) / 1000 / 1000, StatusRecord#status.status]) || {Ip, StatusRecord} <- MonitorData#monitor_data.status, StatusRecord#status.last_heartbeat =/= undefined],
   {noreply, MonitorData};
 handle_cast({heartbeat, Ip}, MonitorData) ->
   {ok, Status} = orddict:find(Ip, MonitorData#monitor_data.status),
   NewStatus = orddict:store(Ip, Status#status{last_heartbeat=os:timestamp()}, MonitorData#monitor_data.status),
-  io:format("Heartbeat from ~p~n", [NewStatus]),
+  % io:format("Heartbeat from ~p~n", [NewStatus]),
   {noreply, MonitorData#monitor_data{status=NewStatus}}.
 
 handle_info({internal, show}, MonitorData) ->
