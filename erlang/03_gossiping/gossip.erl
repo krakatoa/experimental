@@ -7,7 +7,6 @@ start_link() ->
   gen_server:start_link({local, gossip}, ?MODULE, [], []).
 
 init([]) ->
-  % timer:send_interval(5000, self(), get).
   erlang:send_after(5000, self(), {internal, get}),
   {ok, {bind_input()}}.
 
@@ -20,9 +19,7 @@ handle_call(Msg, _From, State) ->
   io:format("Unexpected message: ~p~n", [Msg]),
   {noreply, State}.
 
-%handle_cast({start, Act}, State) ->
-%  {noreply, {bind_input(), Act}};
-handle_cast({send, Data, DestinationIp}, {}) ->
+handle_cast({send, _Data, _DestinationIp}, {}) ->
   io:format("--could not send right now--~n"),
   {noreply, {}};
 handle_cast({send, Data, DestinationIp}, {InputSocket}) ->

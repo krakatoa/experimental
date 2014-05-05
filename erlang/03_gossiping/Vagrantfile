@@ -42,4 +42,13 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     g2.vm.network :private_network, ip: "192.168.33.11"
   end
 
+  config.vm.define "g3" do |g3|
+    g3.vm.provider :virtualbox do |v|
+      v.customize ["modifyvm", :id, "--memory", "512"]
+      v.customize ["modifyvm", :id, "--cpus", 1]
+    end
+
+    g3.vm.network :private_network, ip: "192.168.33.12"
+  end
+
 end

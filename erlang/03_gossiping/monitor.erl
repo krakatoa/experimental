@@ -2,35 +2,25 @@
 -behaviour(gen_server).
 
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2, code_change/3]).
--export([add/3, show/1, check/1, check/2, initialize/1]).
+-export([add_monitor/1, show/1, check/1, check/2]).
 -include("monitor.hrl").
 
 start_link() ->
+  random:seed(now()),
   gen_server:start_link({local, monitor}, ?MODULE, #monitor_data{members=orddict:new(), status=orddict:new(), messages=orddict:new()}, []).
-
-add(Pid, Ip, Member) ->
-  gen_server:call(Pid, {add, Ip, Member}).
 
 show(Pid) ->
   gen_server:cast(Pid, show).
 
-add_agent(Ip, Member=#member{}, MonitorData) ->
-  io:format("IP: ~p~n", [Ip]),
-  % Member = #member{host=Host,tag=Tag,kind=agent},
-  NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
-  NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
-  MonitorData#monitor_data{members=NewMembers, status=NewStatus}.
+add_internal_agent() ->
+  gen_server:cast(?MODULE, {add, "127.0.0.1", #member{host="localhost", tag="internal"}}).
 
-initialize(Act) ->
-  gen_server:cast(gossip, {start, Act}).
-
-add_internal_agent(MonitorData) ->
-  add_agent("127.0.0.1", #member{host="localhost", tag="internal"}, MonitorData).
+add_monitor(Ip) ->
+  gen_server:cast(?MODULE, {add, Ip, #member{host=Ip, kind=monitor}}).
 
 gossip(Member, StatusList) ->
   io:format("ToMember: ~p~n", [Member]),
   {ok, Ip} = inet_parse:address(Member),
-  % [io:format("StatusList: ~p~n", [X]) || X <- StatusList],
   Flattened = list_to_binary(io_lib:format("~w", [StatusList])),
   io:format("monitor:gossip ~p~n", [Flattened]),
   gen_server:cast(gossip, {send, Flattened, Ip}).
@@ -69,30 +59,31 @@ only_monitors(Members) ->
                             end
                           end, orddict:new(), Members),
   [io:format("Members: ~p~n", [X]) || X <- Filtered],
-  % [First|_] = orddict:to_list(Filtered),
   Filtered.
-
-% gen_server:call(monitor, {add, "192.168.33.11", #member{host="192.168.33.11", kind=monitor}}).
 
 init(MonitorData=#monitor_data{}) ->
   erlang:send_after(1000, self(), {internal, show}),
   erlang:send_after(5000, self(), {internal, check}),
-  {ok, add_internal_agent(MonitorData)}.
+  add_internal_agent(),
+  {ok, MonitorData}.
 
-handle_call({add, Ip, Member}, From, MonitorData) ->
-  %NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
-  %NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
-  {reply, ok, add_agent(Ip, Member, MonitorData)}.
+handle_call(_Msg, _From, State) ->
+  {reply, ok, State}.
 
+handle_cast({add, Ip, Member}, MonitorData) ->
+  NewMembers = orddict:store(Ip, Member, MonitorData#monitor_data.members),
+  NewStatus = orddict:store(Ip, #status{}, MonitorData#monitor_data.status),
+  {noreply, MonitorData#monitor_data{members=NewMembers, status=NewStatus}};
 handle_cast(check, MonitorData) ->
   StatusList = check(MonitorData#monitor_data.status),
 
   OnlyMonitors = only_monitors(MonitorData#monitor_data.members),
   case orddict:size(OnlyMonitors) > 0 of
     true ->
-      [{_Key, FirstMember}|_] = OnlyMonitors,
-      FirstIp = FirstMember#member.host,
-      gossip(FirstIp, StatusList);
+      Position = 1 + erlang:trunc(random:uniform() * length(OnlyMonitors)),
+      {_Key, Member} = lists:nth(Position, OnlyMonitors),
+      SelectedIp = Member#member.host,
+      gossip(SelectedIp, StatusList);
     false -> io:format("-- No monitors --~n")
   end,
   {noreply, MonitorData#monitor_data{status=StatusList}};
